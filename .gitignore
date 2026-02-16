@@ -12,3 +12,7 @@ app/review/release-metadata.local.json
 # generated / install artifacts
 app/node_modules
 app/dist
+
+# internal working docs (keep local only)
+AGENTS.md
+学びと気づきログ.md
