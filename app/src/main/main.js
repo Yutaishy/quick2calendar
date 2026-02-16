@@ -48,7 +48,6 @@ let quickShortcutAwaitRelease = false;
 let quickShortcutReleaseTimer = null;
 let quickWindowLastShowAt = 0;
 let quickWindowFocusedSinceShow = false;
-let quickWindowBlurHideTimer = null;
 
 const QUICK_WINDOW_WIDTH = 700;
 const QUICK_WINDOW_COLLAPSED_HEIGHT = 52; // 高さを減らす
@@ -56,9 +55,20 @@ const QUICK_WINDOW_EXPANDED_HEIGHT = 400;
 const QUICK_WINDOW_PIN_LEVEL_DEFAULT = "screen-saver";
 const QUICK_WINDOW_PIN_LEVEL_IME = "floating";
 const QUICK_SHORTCUT_RELEASE_GUARD_MS = 220;
-const QUICK_WINDOW_BLUR_HIDE_GRACE_MS = 2000;
+// Space切替直後など、フォーカスが安定しないタイミングがあるため、
+// 「フォーカスを一度でも得た後」のみ blur で自動非表示にする。
+// （フォーカスを得られないケースで blur が発火すると「一瞬表示→即消える」になる）
+const QUICK_WINDOW_HIDE_ON_BLUR_REQUIRES_FOCUS = true;
 
 const schedulerService = new SchedulerService();
+
+function logQuickWindow(event, data = {}) {
+  try {
+    void appendLog("info", event, data);
+  } catch {
+    // ignore
+  }
+}
 
 function parseAccelerator(accelerator) {
   const tokens = String(accelerator || "")
@@ -290,44 +300,6 @@ function clearQuickWindowFocusRetries() {
   quickWindowFocusRetryTimers = [];
 }
 
-function clearQuickWindowBlurHideTimer() {
-  if (!quickWindowBlurHideTimer) {
-    return;
-  }
-  clearTimeout(quickWindowBlurHideTimer);
-  quickWindowBlurHideTimer = null;
-}
-
-function scheduleQuickWindowHideAfterBlurGrace() {
-  clearQuickWindowBlurHideTimer();
-
-  if (!quickWindowLastShowAt) {
-    hideQuickWindow();
-    return;
-  }
-
-  const elapsed = Date.now() - quickWindowLastShowAt;
-  const remaining = QUICK_WINDOW_BLUR_HIDE_GRACE_MS - elapsed;
-  if (remaining <= 0) {
-    hideQuickWindow();
-    return;
-  }
-
-  quickWindowBlurHideTimer = setTimeout(() => {
-    quickWindowBlurHideTimer = null;
-    if (!quickWindow || quickWindow.isDestroyed() || !quickWindow.isVisible()) {
-      return;
-    }
-    if (quickWindowExpanded) {
-      return;
-    }
-    if (quickWindow.isFocused()) {
-      return;
-    }
-    hideQuickWindow();
-  }, remaining);
-}
-
 function clearQuickShortcutReleaseTimer() {
   if (quickShortcutReleaseTimer) {
     clearTimeout(quickShortcutReleaseTimer);
@@ -395,11 +367,19 @@ function createQuickWindow() {
   quickWindow.on("show", () => {
     pinQuickWindowOnTop();
     quickWindow?.webContents.send("quick:focus");
+    logQuickWindow("quick.window.show", {
+      focused: quickWindow.isFocused(),
+      expanded: quickWindowExpanded,
+      lastShowAt: quickWindowLastShowAt
+    });
   });
   quickWindow.on("focus", () => {
     pinQuickWindowOnTop();
     quickWindowFocusedSinceShow = true;
-    clearQuickWindowBlurHideTimer();
+    logQuickWindow("quick.window.focus", {
+      expanded: quickWindowExpanded,
+      sinceShowMs: quickWindowLastShowAt ? Date.now() - quickWindowLastShowAt : null
+    });
   });
   quickWindow.on("blur", () => {
     if (allowQuickWindowHide || isQuitting) {
@@ -412,19 +392,34 @@ function createQuickWindow() {
     // ただし、会話（expanded）中は別アプリ参照などの操作で勝手に消えるとストレスが大きいため、
     // expanded中は blur では自動非表示にしない（Escape/ショートカットで明示的に隠す）。
     if (quickWindowExpanded) {
+      logQuickWindow("quick.window.blur.ignored_expanded", {
+        focusedSinceShow: quickWindowFocusedSinceShow,
+        sinceShowMs: quickWindowLastShowAt ? Date.now() - quickWindowLastShowAt : null
+      });
       return;
     }
-    // macOSのSpace遷移直後はフォーカスが安定せず、表示直後に blur が発火することがある。
-    // その場合に即時Hideすると「一瞬表示されてすぐ消える」挙動になるため、一定時間は猶予して再フォーカスに賭ける。
-    if (quickWindowLastShowAt && Date.now() - quickWindowLastShowAt < QUICK_WINDOW_BLUR_HIDE_GRACE_MS) {
-      scheduleQuickWindowHideAfterBlurGrace();
+
+    const sinceShowMs = quickWindowLastShowAt
+      ? Date.now() - quickWindowLastShowAt
+      : null;
+
+    if (QUICK_WINDOW_HIDE_ON_BLUR_REQUIRES_FOCUS && !quickWindowFocusedSinceShow) {
+      logQuickWindow("quick.window.blur.ignored_no_focus_since_show", {
+        sinceShowMs
+      });
       return;
     }
-    hideQuickWindow();
+
+    logQuickWindow("quick.window.blur.hide", {
+      sinceShowMs
+    });
+    hideQuickWindow("blur");
   });
   quickWindow.on("hide", () => {
     allowQuickWindowHide = false;
-    clearQuickWindowBlurHideTimer();
+    logQuickWindow("quick.window.hide", {
+      expanded: quickWindowExpanded
+    });
     // hide時の自動復帰は行わない（Raycast型トグル優先）。
   });
 }
@@ -467,12 +462,14 @@ function showQuickWindow() {
 
   allowQuickWindowHide = false;
   clearQuickWindowFocusRetries();
-  clearQuickWindowBlurHideTimer();
   quickWindowImeComposing = false;
   quickWindowLastShowAt = Date.now();
   quickWindowFocusedSinceShow = false;
   // quickWindowExpanded = false; // 状態を維持するためリセットしない
   positionQuickWindowOnCursorDisplay();
+  logQuickWindow("quick.window.show_request", {
+    expanded: quickWindowExpanded
+  });
   
   // 表示前にすべてのワークスペースで表示可能にする（Space遷移防止の要）
   quickWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -493,15 +490,18 @@ function showQuickWindow() {
   }
 }
 
-function hideQuickWindow() {
+function hideQuickWindow(reason = "unknown") {
   if (!quickWindow || quickWindow.isDestroyed() || !quickWindow.isVisible()) {
     return;
   }
 
   clearQuickWindowFocusRetries();
-  clearQuickWindowBlurHideTimer();
   allowQuickWindowHide = true;
   quickWindowImeComposing = false;
+  logQuickWindow("quick.window.hide_request", {
+    reason: String(reason || "unknown"),
+    expanded: quickWindowExpanded
+  });
   quickWindow.hide();
 }
 
@@ -511,7 +511,7 @@ function toggleQuickWindow() {
   }
 
   if (quickWindow.isVisible()) {
-    hideQuickWindow();
+    hideQuickWindow("toggle");
     return;
   }
 
@@ -532,7 +532,7 @@ function showSettingsWindow() {
     createSettingsWindow();
   }
 
-  hideQuickWindow();
+  hideQuickWindow("open_settings");
   if (settingsWindow.isMinimized()) {
     settingsWindow.restore();
   }
@@ -896,7 +896,7 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle("quick:hide", async () => {
-    hideQuickWindow();
+    hideQuickWindow("ipc_hide");
     return { ok: true };
   });
 
