@@ -48,6 +48,7 @@ let quickShortcutAwaitRelease = false;
 let quickShortcutReleaseTimer = null;
 let quickWindowLastShowAt = 0;
 let quickWindowFocusedSinceShow = false;
+let quickWindowBlurHideTimer = null;
 
 const QUICK_WINDOW_WIDTH = 700;
 const QUICK_WINDOW_COLLAPSED_HEIGHT = 52; // 高さを減らす
@@ -59,6 +60,14 @@ const QUICK_SHORTCUT_RELEASE_GUARD_MS = 220;
 // 「フォーカスを一度でも得た後」のみ blur で自動非表示にする。
 // （フォーカスを得られないケースで blur が発火すると「一瞬表示→即消える」になる）
 const QUICK_WINDOW_HIDE_ON_BLUR_REQUIRES_FOCUS = true;
+// Space切替（NSWorkspaceActiveSpaceDidChange）直後は blur が出やすい。
+// これで hide してしまうと「Space移動しただけで勝手に閉じる」になるため、
+// blur発生から hide 実行まで少し猶予を持たせる（その間にフォーカスが戻ればキャンセル）。
+const QUICK_WINDOW_BLUR_HIDE_DELAY_MS = 600;
+// 表示直後は macOS 側のフォーカス遷移で一瞬 blur が発火することがある。
+// これで即hideになると「押した瞬間に消える」ので、短時間だけ blur-hide を無効化する。
+const QUICK_WINDOW_IGNORE_BLUR_AFTER_SHOW_MS = 450;
+const QUICK_WINDOW_MOUSE_CHECK_PADDING = 2000;
 
 const schedulerService = new SchedulerService();
 
@@ -68,6 +77,25 @@ function logQuickWindow(event, data = {}) {
   } catch {
     // ignore
   }
+}
+
+function clearQuickWindowBlurHideTimer() {
+  if (quickWindowBlurHideTimer) {
+    clearTimeout(quickWindowBlurHideTimer);
+    quickWindowBlurHideTimer = null;
+  }
+}
+
+function isPointInsideBounds(point, bounds, padding = 0) {
+  if (!point || !bounds) {
+    return false;
+  }
+  return (
+    point.x >= bounds.x - padding &&
+    point.x <= bounds.x + bounds.width + padding &&
+    point.y >= bounds.y - padding &&
+    point.y <= bounds.y + bounds.height + padding
+  );
 }
 
 function parseAccelerator(accelerator) {
@@ -265,9 +293,6 @@ function pinQuickWindowOnTop() {
     ? QUICK_WINDOW_PIN_LEVEL_IME
     : QUICK_WINDOW_PIN_LEVEL_DEFAULT;
   quickWindow.setAlwaysOnTop(true, pinLevel, 1);
-  quickWindow.setVisibleOnAllWorkspaces(true, {
-    visibleOnFullScreen: true
-  });
   quickWindow.moveTop();
 }
 
@@ -375,6 +400,7 @@ function createQuickWindow() {
   });
   quickWindow.on("focus", () => {
     pinQuickWindowOnTop();
+    clearQuickWindowBlurHideTimer(); // フォーカスが戻ったら hide をキャンセル
     quickWindowFocusedSinceShow = true;
     logQuickWindow("quick.window.focus", {
       expanded: quickWindowExpanded,
@@ -410,13 +436,60 @@ function createQuickWindow() {
       return;
     }
 
-    logQuickWindow("quick.window.blur.hide", {
-      sinceShowMs
-    });
-    hideQuickWindow("blur");
+    if (sinceShowMs !== null && sinceShowMs < QUICK_WINDOW_IGNORE_BLUR_AFTER_SHOW_MS) {
+      logQuickWindow("quick.window.blur.ignored_show_grace", {
+        sinceShowMs
+      });
+      return;
+    }
+
+    // blur即時hideではなく、少し待ってから判定する。
+    // Space切替時は一瞬blurしてもすぐfocusが戻る（あるいはウィンドウが追従する）ため、
+    // この猶予期間中にfocusが戻ればhideはキャンセルされる。
+    logQuickWindow("quick.window.blur.scheduled", { sinceShowMs });
+    
+    quickWindowBlurHideTimer = setTimeout(() => {
+      if (!quickWindow || quickWindow.isDestroyed() || !quickWindow.isVisible()) {
+        return;
+      }
+      
+      // Space切替後、ウィンドウは表示されているがフォーカスを奪われている可能性があるため、
+      // 念のため再フォーカスを試みる。
+      if (!quickWindow.isFocused()) {
+        quickWindow.focus();
+      }
+
+      if (quickWindow.isFocused()) {
+        logQuickWindow("quick.window.blur.hide_cancelled_refocused", {});
+        return;
+      }
+      
+      // フォーカスが戻らなくても、マウスがウィンドウ付近にあれば隠さない（Space移動中対策の最後の砦）
+      try {
+        const cursor = screen.getCursorScreenPoint();
+        const bounds = quickWindow.getBounds();
+        // パディングを広めに取って、ウィンドウ周辺での操作（Space切替等）で消えないようにする
+        if (isPointInsideBounds(cursor, bounds, QUICK_WINDOW_MOUSE_CHECK_PADDING)) {
+           logQuickWindow("quick.window.blur.hide_cancelled_mouse_hover", { cursor, bounds });
+           // 再度フォーカスを試みる
+           if (!quickWindow.isFocused()) {
+             quickWindow.focus();
+           }
+           return;
+        } else {
+           logQuickWindow("quick.window.blur.hide_mouse_outside", { cursor, bounds, padding: QUICK_WINDOW_MOUSE_CHECK_PADDING });
+        }
+      } catch (e) {
+        logQuickWindow("quick.window.blur.mouse_check_error", { error: String(e) });
+      }
+      
+      logQuickWindow("quick.window.blur.hide_executed", { sinceShowMs });
+      hideQuickWindow("blur");
+    }, QUICK_WINDOW_BLUR_HIDE_DELAY_MS);
   });
   quickWindow.on("hide", () => {
     allowQuickWindowHide = false;
+    clearQuickWindowBlurHideTimer();
     logQuickWindow("quick.window.hide", {
       expanded: quickWindowExpanded
     });
@@ -472,8 +545,11 @@ function showQuickWindow() {
   });
   
   // 表示前にすべてのワークスペースで表示可能にする（Space遷移防止の要）
+  // ただし、これによってSpace切替時にblurが発生する場合があるため、
+  // blurハンドラ側で時間差判定を行う。
   quickWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  
+  quickWindow.setAlwaysOnTop(true, "screen-saver");
+
   quickWindow.show();
   focusQuickWindowInput();
 
@@ -498,6 +574,11 @@ function hideQuickWindow(reason = "unknown") {
   clearQuickWindowFocusRetries();
   allowQuickWindowHide = true;
   quickWindowImeComposing = false;
+  try {
+    quickWindow.setVisibleOnAllWorkspaces(false);
+  } catch {
+    // ignore
+  }
   logQuickWindow("quick.window.hide_request", {
     reason: String(reason || "unknown"),
     expanded: quickWindowExpanded
