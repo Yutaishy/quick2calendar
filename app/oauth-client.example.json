@@ -1,0 +1,5 @@
+{
+  "clientId": "YOUR_GOOGLE_OAUTH_CLIENT_ID",
+  "clientSecret": "YOUR_GOOGLE_OAUTH_CLIENT_SECRET",
+  "redirectUri": "http://127.0.0.1:53682/oauth2callback"
+}

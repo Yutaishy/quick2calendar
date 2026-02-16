@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quick2Calendar</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="quick-body">
+    <main class="quick-shell">
+      <form id="quickForm" class="quick-form">
+        <section id="conversationList" class="conversation-list" aria-live="polite"></section>
+
+        <div class="composer-container">
+          <div class="composer-shell">
+            <div class="quick-action-left">
+              <input id="imageInput" type="file" accept="image/*" multiple hidden />
+              <button
+                id="attachImageButton"
+                class="ghost-button quick-mini-button icon-button"
+                type="button"
+                aria-label="Attach image"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                </svg>
+              </button>
+            </div>
+
+            <textarea
+              id="inputText"
+              rows="1"
+              placeholder="質問してみましょう"
+              autofocus
+            ></textarea>
+
+            <div class="quick-actions">
+              <button id="submitButton" class="primary-button icon-button submit-icon-button" type="submit" aria-label="Send">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor">
+                  <path d="M12 2L2 22l10-4 10 4L12 2z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          
+          <div class="status-shell">
+            <p id="attachmentHint" class="attachment-hint" hidden></p>
+            <p id="statusText" class="status" hidden></p>
+          </div>
+        </div>
+      </form>
+    </main>
+
+    <script type="module" src="./quick.js"></script>
+  </body>
+</html>

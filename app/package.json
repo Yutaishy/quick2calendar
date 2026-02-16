@@ -1,0 +1,63 @@
+{
+  "name": "quick2calendar",
+  "version": "0.1.0",
+  "description": "Quick2Calendar desktop app for macOS",
+  "author": "yuta_ishizuka",
+  "private": true,
+  "type": "module",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "setup:oauth": "/bin/sh -lc 'if [ -f oauth-client.local.json ]; then echo \"oauth-client.local.json は既に存在します\"; else cp oauth-client.example.json oauth-client.local.json; echo \"oauth-client.local.json を作成しました。値を編集してください。\"; fi'",
+    "build:oauth": "node scripts/generate-oauth-client-json.mjs",
+    "dist:mac": "npm run build:oauth && node scripts/dist-mac.mjs",
+    "dist:mac:dir": "npm run build:oauth && node scripts/dist-mac.mjs --dir",
+    "dist:mac:arm64": "npm run build:oauth && node scripts/dist-mac.mjs --arch arm64",
+    "dist:mac:x64": "npm run build:oauth && node scripts/dist-mac.mjs --arch x64",
+    "check:review": "node scripts/check-oauth-readiness.mjs",
+    "check:review:strict": "node scripts/check-oauth-readiness.mjs --strict",
+    "check:logic": "node scripts/check-date-parsing.mjs",
+    "check": "node --check src/main/main.js && node --check src/main/scheduler-service.js && node --check src/main/google-auth.js && node --check src/main/google-calendar-client.js && node --check src/main/oauth-config.js && node --check src/main/settings-store.js && node --check src/main/preload-quick.cjs && node --check src/main/preload-settings.cjs && node --check src/renderer/quick.js && node --check src/renderer/settings.js && npm run check:logic"
+  },
+  "build": {
+    "appId": "com.yuta.quick2calendar",
+    "productName": "Quick2Calendar",
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "files": [
+      "src/**/*",
+      "package.json",
+      "oauth-client.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist"
+    },
+    "afterPack": "scripts/after-pack.cjs",
+    "afterSign": "scripts/notarize.cjs",
+    "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+  },
+  "dependencies": {
+    "googleapis": "^148.0.0",
+    "keytar": "^7.9.0",
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "@electron/notarize": "^3.1.1",
+    "electron": "^35.7.5",
+    "electron-builder": "^26.7.0"
+  }
+}

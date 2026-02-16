@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quick2Calendar - 設定</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="settings-body">
+    <div class="settings-drag-handle"></div>
+    <main class="settings-shell">
+      <header class="settings-header">
+        <h1>設定</h1>
+        <p>入力は常にGeminiで解釈してからGoogleカレンダーへ登録します</p>
+      </header>
+
+      <section class="panel">
+        <h2>Google連携</h2>
+        <p id="oauthConfigStatus" class="inline-status">OAuth設定: 未確認</p>
+        <div class="button-group">
+          <button id="connectGoogleButton" class="primary-button" type="button">
+            Googleを接続
+          </button>
+          <button id="disconnectGoogleButton" class="ghost-button" type="button">
+            接続解除
+          </button>
+          <span id="googleStatus" class="inline-status">状態: 未確認</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>起動ショートカット</h2>
+        <div class="shortcut-editor">
+          <p class="shortcut-caption">現在のショートカット</p>
+          <div class="shortcut-row">
+            <input id="shortcutCaptureInput" type="text" readonly />
+            <button id="recordShortcutButton" class="ghost-button" type="button">
+              ショートカットを記録
+            </button>
+            <button id="resetShortcutButton" class="ghost-button" type="button">
+              既定値に戻す
+            </button>
+          </div>
+          <p id="shortcutStatus" class="inline-status">現在: 未確認</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Gemini</h2>
+        <div class="grid two-col">
+          <label>
+            Gemini APIキー
+            <input id="geminiApiKey" type="password" placeholder="再表示されません" />
+          </label>
+          <label>
+            使用モデル
+            <select id="modelPreset"></select>
+          </label>
+          <label id="modelCustomWrap" hidden>
+            カスタムモデル名
+            <input id="modelCustom" type="text" placeholder="例: gemini-3-flash-preview" />
+          </label>
+        </div>
+        <div class="button-group">
+          <button id="saveGeminiKeyButton" class="ghost-button" type="button">APIキー保存</button>
+          <span id="geminiStatus" class="inline-status">状態: 未確認</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>カスタム指示</h2>
+        <label>
+          Geminiに渡す固定プロンプト
+          <textarea id="geminiInstruction" rows="8" placeholder="例: 日時が曖昧な場合は1つずつ確認してから登録する"></textarea>
+        </label>
+      </section>
+
+      <section class="panel">
+        <h2>診断ログ</h2>
+        <p id="logPathStatus" class="inline-status">ログファイル: 未確認</p>
+        <div class="button-group">
+          <button id="reloadLogsButton" class="ghost-button" type="button">再読み込み</button>
+          <button id="openLogFileButton" class="ghost-button" type="button">ログファイルを開く</button>
+        </div>
+        <label>
+          直近ログ（新しい順）
+          <textarea id="recentLogs" class="log-viewer" rows="10" readonly></textarea>
+        </label>
+      </section>
+
+      <footer class="settings-footer">
+        <p id="saveStatus" class="inline-status">未保存の変更があります</p>
+        <button id="saveSettingsButton" class="primary-button" type="button">設定を保存</button>
+      </footer>
+    </main>
+
+    <script type="module" src="./settings.js"></script>
+  </body>
+</html>

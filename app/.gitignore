@@ -1,0 +1,15 @@
+node_modules
+dist
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+oauth-client.json
+oauth-client.local.json
+review/release-metadata.local.json
+
+# signing / notarization secrets (never commit)
+*.p12
+*.p8
+AuthKey_*.p8

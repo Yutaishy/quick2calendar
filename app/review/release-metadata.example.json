@@ -1,0 +1,24 @@
+{
+  "appName": "Quick2Calendar",
+  "supportEmail": "support@example.com",
+  "developerContactEmail": "dev@example.com",
+  "homepageUrl": "https://example.com/quick2calendar",
+  "privacyPolicyUrl": "https://example.com/privacy",
+  "termsOfServiceUrl": "https://example.com/terms",
+  "dataDeletionUrl": "https://example.com/data-deletion",
+  "authorizedDomains": [
+    "example.com"
+  ],
+  "oauthClientType": "desktop",
+  "oauthRedirectUris": [
+    "http://127.0.0.1:53682/oauth2callback"
+  ],
+  "requestedScopes": [
+    "https://www.googleapis.com/auth/calendar.events"
+  ],
+  "scopeJustification": {
+    "https://www.googleapis.com/auth/calendar.events": "自然文から予定を自動作成し、ユーザーの明示操作でGoogleカレンダーへ登録するため。"
+  },
+  "verificationVideoUrl": "https://example.com/verification-video",
+  "notes": "審査提出時はこのファイルを review/release-metadata.local.json として実運用値へ更新する。"
+}
