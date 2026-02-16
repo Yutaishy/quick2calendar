@@ -56,6 +56,111 @@ const QUICK_SHORTCUT_RELEASE_GUARD_MS = 220;
 
 const schedulerService = new SchedulerService();
 
+function parseAccelerator(accelerator) {
+  const tokens = String(accelerator || "")
+    .split("+")
+    .map((token) => token.trim())
+    .filter(Boolean);
+  if (tokens.length === 0) {
+    return null;
+  }
+  return {
+    key: tokens[tokens.length - 1],
+    modifiers: new Set(tokens.slice(0, -1))
+  };
+}
+
+function normalizeAcceleratorKey(key) {
+  const value = String(key || "");
+  if (!value) {
+    return "";
+  }
+  // Letters should match regardless of shift-case.
+  if (/^[a-z]$/i.test(value)) {
+    return value.toUpperCase();
+  }
+  return value;
+}
+
+function resolveInputKeyToken(input) {
+  const code = String(input?.code || "");
+  if (/^Key[A-Z]$/.test(code)) {
+    return code.slice(3);
+  }
+  if (/^Digit[0-9]$/.test(code)) {
+    return code.slice(5);
+  }
+  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(code)) {
+    return code;
+  }
+  if (code === "Space") {
+    return "Space";
+  }
+
+  const key = String(input?.key || "");
+  if (key === " ") {
+    return "Space";
+  }
+  if (key.length === 1) {
+    return key;
+  }
+  return key;
+}
+
+function inputMatchesAccelerator(input, accelerator) {
+  const parsed = parseAccelerator(accelerator);
+  if (!parsed) {
+    return false;
+  }
+
+  const actualKey = normalizeAcceleratorKey(resolveInputKeyToken(input));
+  const expectedKey = normalizeAcceleratorKey(parsed.key);
+  if (!actualKey || !expectedKey || actualKey !== expectedKey) {
+    return false;
+  }
+
+  const modifiers = parsed.modifiers;
+  const expectsShift = modifiers.has("Shift");
+  const expectsAlt = modifiers.has("Alt");
+  const expectsCommand = modifiers.has("Command");
+  const expectsControl = modifiers.has("Control");
+  const expectsCommandOrControl = modifiers.has("CommandOrControl");
+
+  const hasShift = Boolean(input?.shift);
+  const hasAlt = Boolean(input?.alt);
+  const hasCommand = Boolean(input?.meta);
+  const hasControl = Boolean(input?.control);
+
+  if (expectsCommandOrControl && !(hasCommand || hasControl)) {
+    return false;
+  }
+
+  if (expectsShift !== hasShift) {
+    return false;
+  }
+  if (expectsAlt !== hasAlt) {
+    return false;
+  }
+
+  if (expectsCommand) {
+    if (!hasCommand) {
+      return false;
+    }
+  } else if (!expectsCommandOrControl && hasCommand) {
+    return false;
+  }
+
+  if (expectsControl) {
+    if (!hasControl) {
+      return false;
+    }
+  } else if (!expectsCommandOrControl && hasControl) {
+    return false;
+  }
+
+  return true;
+}
+
 function buildTrayIcon() {
   const base64 =
     "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAQAAAC1+jfqAAAAW0lEQVR4AWP4DwQMWAThP4QxMjAwkI2NjY1BvP///w8GJgYGBm4mBiYGBv7//x8lI6P8/3+gmYGBwYb8////FwYGBjYqKioeJxcXF4jMTEzEDAwMDAwAACjVDqvJsteUAAAAAElFTkSuQmCC";
@@ -219,6 +324,30 @@ function createQuickWindow() {
   });
 
   quickWindow.loadFile(path.join(__dirname, "../renderer/quick.html"));
+
+  // Quickウィンドウがフォーカス中でも「起動ショートカット」で確実にトグルできるようにする。
+  // 一部のアクセラレータ（例: Alt+Space 等）は、ウィンドウがフォーカス中だと globalShortcut が発火しないことがある。
+  quickWindow.webContents.on("before-input-event", (event, input) => {
+    try {
+      if (!quickWindow || quickWindow.isDestroyed() || !quickWindow.isVisible()) {
+        return;
+      }
+      if (input?.type !== "keyDown" || input?.isAutoRepeat) {
+        return;
+      }
+      if (!registeredShortcut) {
+        return;
+      }
+      if (!inputMatchesAccelerator(input, registeredShortcut)) {
+        return;
+      }
+      event.preventDefault();
+      toggleQuickWindowFromShortcut();
+    } catch {
+      // ignore
+    }
+  });
+
   pinQuickWindowOnTop();
   quickWindow.setFullScreenable(false);
   quickWindow.on("show", () => {
@@ -236,6 +365,11 @@ function createQuickWindow() {
       return;
     }
     // フォーカスが外れたら隠す (ChatGPT風)
+    // ただし、会話（expanded）中は別アプリ参照などの操作で勝手に消えるとストレスが大きいため、
+    // expanded中は blur では自動非表示にしない（Escape/ショートカットで明示的に隠す）。
+    if (quickWindowExpanded) {
+      return;
+    }
     hideQuickWindow();
   });
   quickWindow.on("hide", () => {
