@@ -36,4 +36,4 @@
 
 ## 運用メモ
 - `release-metadata.local.json` は機密・運用情報を含むためGit管理しない。
-- 仕様変更（スコープや認証フロー変更）時は、このガイドと `学びと気づきログ.md` を同時更新する。
+- 仕様変更（スコープや認証フロー変更）時は、このガイドと公開ドキュメント（`README.md` / `app/README.md` / `review/RELEASE_GUIDE.md`）を同時更新する。

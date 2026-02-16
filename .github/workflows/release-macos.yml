@@ -38,6 +38,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate public release surface
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          FORBIDDEN_FILES=("AGENTS.md" "学びと気づきログ.md" "デザインUX.md" "要件定義.md")
+          for file in "${FORBIDDEN_FILES[@]}"; do
+            if git ls-files --error-unmatch "$file" > /dev/null 2>&1; then
+              echo "::error file=$file::公開対象外ファイルがgit追跡されています"
+              exit 1
+            fi
+          done
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

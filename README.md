@@ -5,11 +5,11 @@
 
 ## ドキュメント
 
-- 仕様: `要件定義.md`
-- UI/UX一次仕様: `デザインUX.md`
 - アプリ実装README: `app/README.md`
 - OAuth審査ガイド: `app/review/OAUTH_VERIFICATION_GUIDE.md`
 - GitHub配布（署名/Notarization）: `app/review/RELEASE_GUIDE.md`
+
+> 補足: 内部向け作業ドキュメント（仕様メモや学習ログ）は公開リポジトリの配布対象外です。
 
 ## 開発（ローカル起動）
 

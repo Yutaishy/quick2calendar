@@ -138,6 +138,35 @@ Apple ID方式:
 3. GitHubへpush  
    → Actionsが走り、Releaseに `dmg/zip` が添付されます
 
+### 5.5 公開対象チェック（必須）
+
+タグ作成前に、公開対象外ファイルが追跡されていないことを確認します。
+
+```bash
+if git ls-files | rg "AGENTS\\.md|学びと気づきログ\\.md|デザインUX\\.md|要件定義\\.md" > /dev/null; then
+  echo "NG: 公開対象外ファイルがgit追跡されています"
+  exit 1
+fi
+```
+
+> CI (`.github/workflows/release-macos.yml`) でも同じ検査を実行し、混入時はリリースを失敗させます。
+
+### 5.6 誤リリース時の是正手順
+
+公開対象外ファイルを含むタグ/Releaseを出してしまった場合は、以下を実施します。
+
+```bash
+# 1) 該当Releaseを削除
+gh release delete <tag> --yes
+
+# 2) ローカル/リモートのタグを削除
+git tag -d <tag>
+git push origin :refs/tags/<tag>
+
+# 3) 修正後に新しいバージョンで再リリース
+#    （同じタグの再利用はしない）
+```
+
 ## 6. 署名・Notarizationの検証（任意）
 
 （目視/運用の簡易検証）
