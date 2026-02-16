@@ -48,6 +48,7 @@ let quickShortcutAwaitRelease = false;
 let quickShortcutReleaseTimer = null;
 let quickWindowLastShowAt = 0;
 let quickWindowFocusedSinceShow = false;
+let quickWindowBlurHideTimer = null;
 
 const QUICK_WINDOW_WIDTH = 700;
 const QUICK_WINDOW_COLLAPSED_HEIGHT = 52; // 高さを減らす
@@ -55,7 +56,7 @@ const QUICK_WINDOW_EXPANDED_HEIGHT = 400;
 const QUICK_WINDOW_PIN_LEVEL_DEFAULT = "screen-saver";
 const QUICK_WINDOW_PIN_LEVEL_IME = "floating";
 const QUICK_SHORTCUT_RELEASE_GUARD_MS = 220;
-const QUICK_WINDOW_BLUR_HIDE_GRACE_MS = 900;
+const QUICK_WINDOW_BLUR_HIDE_GRACE_MS = 2000;
 
 const schedulerService = new SchedulerService();
 
@@ -289,6 +290,44 @@ function clearQuickWindowFocusRetries() {
   quickWindowFocusRetryTimers = [];
 }
 
+function clearQuickWindowBlurHideTimer() {
+  if (!quickWindowBlurHideTimer) {
+    return;
+  }
+  clearTimeout(quickWindowBlurHideTimer);
+  quickWindowBlurHideTimer = null;
+}
+
+function scheduleQuickWindowHideAfterBlurGrace() {
+  clearQuickWindowBlurHideTimer();
+
+  if (!quickWindowLastShowAt) {
+    hideQuickWindow();
+    return;
+  }
+
+  const elapsed = Date.now() - quickWindowLastShowAt;
+  const remaining = QUICK_WINDOW_BLUR_HIDE_GRACE_MS - elapsed;
+  if (remaining <= 0) {
+    hideQuickWindow();
+    return;
+  }
+
+  quickWindowBlurHideTimer = setTimeout(() => {
+    quickWindowBlurHideTimer = null;
+    if (!quickWindow || quickWindow.isDestroyed() || !quickWindow.isVisible()) {
+      return;
+    }
+    if (quickWindowExpanded) {
+      return;
+    }
+    if (quickWindow.isFocused()) {
+      return;
+    }
+    hideQuickWindow();
+  }, remaining);
+}
+
 function clearQuickShortcutReleaseTimer() {
   if (quickShortcutReleaseTimer) {
     clearTimeout(quickShortcutReleaseTimer);
@@ -360,6 +399,7 @@ function createQuickWindow() {
   quickWindow.on("focus", () => {
     pinQuickWindowOnTop();
     quickWindowFocusedSinceShow = true;
+    clearQuickWindowBlurHideTimer();
   });
   quickWindow.on("blur", () => {
     if (allowQuickWindowHide || isQuitting) {
@@ -375,18 +415,16 @@ function createQuickWindow() {
       return;
     }
     // macOSのSpace遷移直後はフォーカスが安定せず、表示直後に blur が発火することがある。
-    // その場合に即時Hideすると「一瞬表示されてすぐ消える」挙動になるため、短時間だけ猶予する。
-    if (
-      !quickWindowFocusedSinceShow &&
-      quickWindowLastShowAt &&
-      Date.now() - quickWindowLastShowAt < QUICK_WINDOW_BLUR_HIDE_GRACE_MS
-    ) {
+    // その場合に即時Hideすると「一瞬表示されてすぐ消える」挙動になるため、一定時間は猶予して再フォーカスに賭ける。
+    if (quickWindowLastShowAt && Date.now() - quickWindowLastShowAt < QUICK_WINDOW_BLUR_HIDE_GRACE_MS) {
+      scheduleQuickWindowHideAfterBlurGrace();
       return;
     }
     hideQuickWindow();
   });
   quickWindow.on("hide", () => {
     allowQuickWindowHide = false;
+    clearQuickWindowBlurHideTimer();
     // hide時の自動復帰は行わない（Raycast型トグル優先）。
   });
 }
@@ -429,6 +467,7 @@ function showQuickWindow() {
 
   allowQuickWindowHide = false;
   clearQuickWindowFocusRetries();
+  clearQuickWindowBlurHideTimer();
   quickWindowImeComposing = false;
   quickWindowLastShowAt = Date.now();
   quickWindowFocusedSinceShow = false;
@@ -442,7 +481,7 @@ function showQuickWindow() {
   focusQuickWindowInput();
 
   // macOS側で直後にフォーカスが戻るケースに備えて短時間だけ再試行する。
-  const retryDelays = [60, 180, 360];
+  const retryDelays = [60, 180, 360, 700, 1100, 1600];
   for (const delay of retryDelays) {
     const timer = setTimeout(() => {
       if (!quickWindow || quickWindow.isDestroyed() || !quickWindow.isVisible()) {
@@ -460,6 +499,7 @@ function hideQuickWindow() {
   }
 
   clearQuickWindowFocusRetries();
+  clearQuickWindowBlurHideTimer();
   allowQuickWindowHide = true;
   quickWindowImeComposing = false;
   quickWindow.hide();
