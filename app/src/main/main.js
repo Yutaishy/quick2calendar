@@ -46,6 +46,8 @@ let quickWindowImeComposing = false;
 let quickWindowFocusRetryTimers = [];
 let quickShortcutAwaitRelease = false;
 let quickShortcutReleaseTimer = null;
+let quickWindowLastShowAt = 0;
+let quickWindowFocusedSinceShow = false;
 
 const QUICK_WINDOW_WIDTH = 700;
 const QUICK_WINDOW_COLLAPSED_HEIGHT = 52; // 高さを減らす
@@ -53,6 +55,7 @@ const QUICK_WINDOW_EXPANDED_HEIGHT = 400;
 const QUICK_WINDOW_PIN_LEVEL_DEFAULT = "screen-saver";
 const QUICK_WINDOW_PIN_LEVEL_IME = "floating";
 const QUICK_SHORTCUT_RELEASE_GUARD_MS = 220;
+const QUICK_WINDOW_BLUR_HIDE_GRACE_MS = 900;
 
 const schedulerService = new SchedulerService();
 
@@ -356,6 +359,7 @@ function createQuickWindow() {
   });
   quickWindow.on("focus", () => {
     pinQuickWindowOnTop();
+    quickWindowFocusedSinceShow = true;
   });
   quickWindow.on("blur", () => {
     if (allowQuickWindowHide || isQuitting) {
@@ -368,6 +372,15 @@ function createQuickWindow() {
     // ただし、会話（expanded）中は別アプリ参照などの操作で勝手に消えるとストレスが大きいため、
     // expanded中は blur では自動非表示にしない（Escape/ショートカットで明示的に隠す）。
     if (quickWindowExpanded) {
+      return;
+    }
+    // macOSのSpace遷移直後はフォーカスが安定せず、表示直後に blur が発火することがある。
+    // その場合に即時Hideすると「一瞬表示されてすぐ消える」挙動になるため、短時間だけ猶予する。
+    if (
+      !quickWindowFocusedSinceShow &&
+      quickWindowLastShowAt &&
+      Date.now() - quickWindowLastShowAt < QUICK_WINDOW_BLUR_HIDE_GRACE_MS
+    ) {
       return;
     }
     hideQuickWindow();
@@ -417,6 +430,8 @@ function showQuickWindow() {
   allowQuickWindowHide = false;
   clearQuickWindowFocusRetries();
   quickWindowImeComposing = false;
+  quickWindowLastShowAt = Date.now();
+  quickWindowFocusedSinceShow = false;
   // quickWindowExpanded = false; // 状態を維持するためリセットしない
   positionQuickWindowOnCursorDisplay();
   
