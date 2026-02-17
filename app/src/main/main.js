@@ -1091,6 +1091,11 @@ if (app.dock) {
 }
 
 app.whenReady().then(async () => {
+  // 念のためここでもDock非表示を呼ぶ（開発モード等での確実性向上）
+  if (app.dock) {
+    app.dock.hide();
+  }
+
   await ensureSettingsFile();
   try {
     await appendLog("info", "app.started", {

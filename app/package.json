@@ -1,6 +1,6 @@
 {
   "name": "quick2calendar",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Quick2Calendar desktop app for macOS",
   "author": "yuta_ishizuka",
   "private": true,
@@ -44,7 +44,10 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.inherit.plist"
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "extendInfo": {
+        "LSUIElement": true
+      }
     },
     "afterPack": "scripts/after-pack.cjs",
     "afterSign": "scripts/notarize.cjs",
