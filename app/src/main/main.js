@@ -735,17 +735,13 @@ function registerShortcut(shortcut, options = { allowFallback: true }) {
 
 async function applyLoginItemSettings(settingsOverride = null) {
   const settings = settingsOverride || (await getSettings());
-  if (!settings.launchAtLogin) {
-    return;
-  }
-
   if (!app.isPackaged) {
     return;
   }
 
   try {
     app.setLoginItemSettings({
-      openAtLogin: true
+      openAtLogin: Boolean(settings.launchAtLogin)
     });
   } catch (error) {
     console.warn(
