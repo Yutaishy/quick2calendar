@@ -7,7 +7,7 @@
   "type": "module",
   "main": "src/main/main.js",
   "scripts": {
-    "start": "ELECTRON_RUN_AS_NODE= electron .",
+    "start": "electron .",
     "setup:oauth": "/bin/sh -lc 'if [ -f oauth-client.local.json ]; then echo \"oauth-client.local.json は既に存在します\"; else cp oauth-client.example.json oauth-client.local.json; echo \"oauth-client.local.json を作成しました。値を編集してください。\"; fi'",
     "build:oauth": "node scripts/generate-oauth-client-json.mjs",
     "dist:mac": "npm run build:oauth && node scripts/dist-mac.mjs",
@@ -17,7 +17,9 @@
     "check:review": "node scripts/check-oauth-readiness.mjs",
     "check:review:strict": "node scripts/check-oauth-readiness.mjs --strict",
     "check:logic": "node scripts/check-date-parsing.mjs",
-    "check": "node --check src/main/main.js && node --check src/main/scheduler-service.js && node --check src/main/google-auth.js && node --check src/main/google-calendar-client.js && node --check src/main/oauth-config.js && node --check src/main/settings-store.js && node --check src/main/preload-quick.cjs && node --check src/main/preload-settings.cjs && node --check src/renderer/quick.js && node --check src/renderer/settings.js && npm run check:logic"
+    "check": "node --check src/main/main.js && node --check src/main/scheduler-service.js && node --check src/main/google-auth.js && node --check src/main/google-calendar-client.js && node --check src/main/oauth-config.js && node --check src/main/settings-store.js && node --check src/main/preload-quick.cjs && node --check src/main/preload-settings.cjs && node --check src/renderer/quick.js && node --check src/renderer/settings.js && npm run check:logic",
+    "setup:linux-deps": "bash scripts/setup-linux-electron-deps.sh",
+    "smoke:linux": "bash scripts/run-headless-smoke-linux.sh"
   },
   "build": {
     "appId": "com.yuta.quick2calendar",

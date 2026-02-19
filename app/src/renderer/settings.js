@@ -389,20 +389,26 @@ function buildInstructionPreset(text) {
 function collectPatch() {
   const instruction = geminiInstruction.value.trim();
   const launchAtLogin = Boolean(currentSettings?.launchAtLogin);
+  const patch = {};
 
-  return {
-    calendarId: "primary",
-    model: getSelectedModel(),
-    aiEnabled: true,
-    inputMode: "ai",
-    launchAtLogin,
-    askPolicy: "uncertain_only",
-    confirmationPolicy: "uncertain_only",
-    geminiInstruction: instruction,
-    timeResolutionRulesText: "",
-    customInstructionPresets: buildInstructionPreset(instruction),
-    activeInstructionPresetId: "default"
-  };
+  // この画面で実際に編集する項目のみ差分保存する。
+  // 未編集設定を固定値で上書きしないことで、接続操作時の意図しない設定破壊を防ぐ。
+  const selectedModel = getSelectedModel();
+  if (selectedModel !== String(currentSettings?.model || "")) {
+    patch.model = selectedModel;
+  }
+
+  if (instruction !== deriveInstructionText(currentSettings)) {
+    patch.geminiInstruction = instruction;
+    patch.customInstructionPresets = buildInstructionPreset(instruction);
+    patch.activeInstructionPresetId = "default";
+  }
+
+  if (launchAtLogin !== Boolean(currentSettings?.launchAtLogin)) {
+    patch.launchAtLogin = launchAtLogin;
+  }
+
+  return patch;
 }
 
 async function refreshSecretStatus() {
@@ -523,7 +529,6 @@ connectGoogleButton.addEventListener("click", async () => {
 
   try {
     markStatus("ブラウザでGoogle認証を進めてください...", "default");
-    await window.settingsApi.saveSettings(collectPatch());
     await window.settingsApi.connectGoogle();
     await refreshSecretStatus();
     markStatus("Google連携が完了しました", "success");
