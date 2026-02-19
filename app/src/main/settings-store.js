@@ -76,7 +76,7 @@ function mergeWithDefaults(rawSettings = {}) {
   merged.shortcut = String(merged.shortcut || DEFAULT_SETTINGS.shortcut);
   merged.inputMode = "ai";
   merged.aiEnabled = true;
-  merged.launchAtLogin = false;
+  merged.launchAtLogin = Boolean(merged.launchAtLogin);
   merged.calendarId = String(merged.calendarId || "primary");
   merged.model = String(merged.model || DEFAULT_SETTINGS.model);
   delete merged.oauthClientId;

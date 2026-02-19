@@ -388,13 +388,14 @@ function buildInstructionPreset(text) {
 
 function collectPatch() {
   const instruction = geminiInstruction.value.trim();
+  const launchAtLogin = Boolean(currentSettings?.launchAtLogin);
 
   return {
     calendarId: "primary",
     model: getSelectedModel(),
     aiEnabled: true,
     inputMode: "ai",
-    launchAtLogin: false,
+    launchAtLogin,
     askPolicy: "uncertain_only",
     confirmationPolicy: "uncertain_only",
     geminiInstruction: instruction,
