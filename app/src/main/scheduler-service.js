@@ -398,13 +398,25 @@ export class SchedulerService {
           break;
         }
         case "duplicate_confirm": {
-          if (!isAffirmative(answer)) {
+          if (isNegative(answer)) {
             this.sessions.delete(sessionId);
             return {
               status: "cancelled",
               message: "重複候補があるため登録を中止しました。"
             };
           }
+
+          if (!isAffirmative(answer)) {
+            return this.askQuestion(
+              {
+                ...session,
+                sourceImages: mergedSourceImages,
+                question: "重複候補があります。登録するなら「はい」、中止するなら「いいえ」と入力してください。"
+              },
+              sessionId
+            );
+          }
+
           session.draft.duplicateConfirmed = true;
           break;
         }

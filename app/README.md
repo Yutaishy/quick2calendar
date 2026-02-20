@@ -66,6 +66,21 @@ npm start
 npm run check
 ```
 
+
+## Linuxコンテナでの実行検証（CI/QA向け）
+Linuxコンテナで Electron を実行する場合は、依存ライブラリ・D-Bus・Secret Service・仮想ディスプレイが必要です。
+
+```bash
+npm run setup:linux-deps
+npm run smoke:linux
+```
+
+- `setup:linux-deps`: aptベース環境向けに必要パッケージをインストール
+- `smoke:linux`: `dbus-run-session` + `gnome-keyring-daemon` + `xvfb-run` でヘッドレス起動スモークテスト
+
+> 補足: `smoke:linux` は既定で20秒後に `timeout` で終了します。
+> 必要なら `SMOKE_TIMEOUT_SECONDS=40 npm run smoke:linux` のように延長してください。
+
 ## 配布ビルド（macOS .app/.dmg/.zip）
 GitHub配布向けに **electron-builder** で成果物を生成できます（署名/Notarizationは後述ガイド参照）。
 

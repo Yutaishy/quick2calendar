@@ -67,9 +67,15 @@ const QUICK_WINDOW_BLUR_HIDE_DELAY_MS = 600;
 // 表示直後は macOS 側のフォーカス遷移で一瞬 blur が発火することがある。
 // これで即hideになると「押した瞬間に消える」ので、短時間だけ blur-hide を無効化する。
 const QUICK_WINDOW_IGNORE_BLUR_AFTER_SHOW_MS = 450;
-const QUICK_WINDOW_MOUSE_CHECK_PADDING = 2000;
+const QUICK_WINDOW_MOUSE_CHECK_PADDING = 96;
 
 const schedulerService = new SchedulerService();
+
+// Linux headless/CI では GPU 初期化エラーが頻発するため、
+// 非macOS環境ではハードウェアアクセラレーションを無効化する。
+if (process.platform !== "darwin") {
+  app.disableHardwareAcceleration();
+}
 
 function logQuickWindow(event, data = {}) {
   try {
